@@ -29,7 +29,6 @@
                     class="btn btn-outline btn-primary btn-sm">
               <i class="fas fa-external-link-alt"></i> Ver Loja
             </button>
-
         </div>
     </div>
 
@@ -53,14 +52,12 @@
                 </div>
                 <div class="stat-title">Total de Produtos</div>
                 <div id="stat-total" class="stat-value text-primary">0</div>
-                <div class="stat-desc">Sincronizado com vy_store.html</div>
+                <div class="stat-desc">Sincronizado com Firestore</div>
             </div>
         </div>
 
         <!-- Product Grid -->
-        <div id="product-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            <!-- Products will be injected here -->
-        </div>
+        <div id="product-list" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"></div>
 
         <!-- Empty State -->
         <div id="empty-state" class="hidden flex flex-col items-center justify-center py-20 text-center">
@@ -80,32 +77,32 @@
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div class="form-control w-full">
                         <label class="label"><span class="label-text">Título do Produto</span></label>
-                        <input type="text" id="title" placeholder="Ex: Ebook Marketing Digital" class="input input-bordered w-full" required />
+                        <input type="text" id="title" class="input input-bordered w-full" required />
                     </div>
                     <div class="form-control w-full">
                         <label class="label"><span class="label-text">Preço (R$)</span></label>
-                        <input type="text" id="price" placeholder="Ex: 47,90" class="input input-bordered w-full" required />
+                        <input type="text" id="price" class="input input-bordered w-full" required />
                     </div>
                 </div>
 
                 <div class="form-control w-full mt-2">
                     <label class="label"><span class="label-text">Descrição Curta</span></label>
-                    <textarea id="description" class="textarea textarea-bordered h-24" placeholder="Descreva os benefícios do produto..." required></textarea>
+                    <textarea id="description" class="textarea textarea-bordered h-24" required></textarea>
                 </div>
 
                 <div class="form-control w-full mt-2">
                     <label class="label"><span class="label-text">URL da Imagem</span></label>
-                    <input type="url" id="image" placeholder="https://exemplo.com/imagem.jpg" class="input input-bordered w-full" required />
+                    <input type="url" id="image" class="input input-bordered w-full" required />
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
                     <div class="form-control w-full">
                         <label class="label"><span class="label-text">Texto do Botão</span></label>
-                        <input type="text" id="btnText" placeholder="Ex: Comprar Agora" class="input input-bordered w-full" required />
+                        <input type="text" id="btnText" class="input input-bordered w-full" required />
                     </div>
                     <div class="form-control w-full">
                         <label class="label"><span class="label-text">Link de Checkout</span></label>
-                        <input type="url" id="checkoutLink" placeholder="https://pagamento.com/..." class="input input-bordered w-full" required />
+                        <input type="url" id="checkoutLink" class="input input-bordered w-full" required />
                     </div>
                 </div>
 
@@ -117,9 +114,32 @@
         </div>
     </dialog>
 
-    <script>
-        const STORAGE_KEY = 'vy_store_data';
-        let products = JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+    <!-- Script Firebase -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getFirestore, collection, addDoc, getDocs, updateDoc, deleteDoc, doc } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore.js";
+
+        const firebaseConfig = {
+          apiKey: "SUA_API_KEY",
+          authDomain: "vy-loja.firebaseapp.com",
+          projectId: "vy-loja",
+          storageBucket: "vy-loja.appspot.com",
+          messagingSenderId: "1440651873617",
+          appId: "1:140651873617:web:01d1dcb7a94c919c197f70"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        let products = [];
+        let productIds = [];
+
+        async function loadProducts() {
+            const querySnapshot = await getDocs(collection(db, "products"));
+            products = querySnapshot.docs.map(docSnap => docSnap.data());
+            productIds = querySnapshot.docs.map(docSnap => docSnap.id);
+            renderProducts();
+        }
 
         function renderProducts() {
             const list = document.getElementById('product-list');
@@ -137,7 +157,7 @@
                     list.innerHTML += `
                         <div class="card bg-base-100 shadow-xl border border-white/5 overflow-hidden">
                             <figure class="h-48 overflow-hidden">
-                                <img src="${p.image}" alt="${p.title}" class="w-full h-full object-cover" onerror="this.src='https://via.placeholder.com/400x300?text=Erro+na+Imagem'"/>
+                                <img src="${p.image}" alt="${p.title}" class="w-full h-full object-cover"/>
                             </figure>
                             <div class="card-body p-5">
                                 <div class="flex justify-between items-start">
@@ -160,7 +180,7 @@
             }
         }
 
-        function handleSave(e) {
+        async function handleSave(e) {
             e.preventDefault();
             const id = document.getElementById('edit-id').value;
             const newProduct = {
@@ -172,22 +192,33 @@
                 checkoutLink: document.getElementById('checkoutLink').value
             };
 
-            if (id === "") {
-                products.push(newProduct);
-            } else {
-                products[id] = newProduct;
+            try {
+                if (id === "") {
+                    // Novo produto
+                    await addDoc(collection(db, "products"), newProduct);
+                } else {
+                    // Editar produto existente
+                    const productRef = doc(db, "products", productIds[id]);
+                    await updateDoc(productRef, newProduct);
+                }
+                closeModal();
+                loadProducts();
+            } catch (error) {
+                console.error("Erro ao salvar produto:", error);
+                alert("❌ Erro ao salvar produto.");
             }
-
-            saveData();
-            closeModal();
-            renderProducts();
         }
 
-        function deleteProduct(index) {
-            if (confirm('Tem certeza que deseja excluir este produto? Isso atualizará a loja imediatamente.')) {
-                products.splice(index, 1);
-                saveData();
-                renderProducts();
+        async function deleteProduct(index) {
+            if (confirm('Tem certeza que deseja excluir este produto?')) {
+                try {
+                    const productRef = doc(db, "products", productIds[index]);
+                    await deleteDoc(productRef);
+                    loadProducts();
+                } catch (error) {
+                    console.error("Erro ao excluir produto:", error);
+                    alert("❌ Erro ao excluir produto.");
+                }
             }
         }
 
@@ -201,7 +232,6 @@
             document.getElementById('image').value = p.image;
             document.getElementById('btnText').value = p.btnText;
             document.getElementById('checkoutLink').value = p.checkoutLink;
-            
             document.getElementById('product_modal').showModal();
         }
 
@@ -216,19 +246,8 @@
             document.getElementById('product_modal').close();
         }
 
-        function saveData() {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(products));
-            // Disparar evento de storage manualmente para a mesma aba (opcional)
-            window.dispatchEvent(new Event('storage'));
-        }
-
-        function openStore() {
-            // Nota: Assume que o arquivo vy_store.html está na mesma pasta
-            window.open('vy_store.html', '_blank');
-        }
-
         // Inicializar
-        renderProducts();
+        loadProducts();
     </script>
 </body>
 </html>
