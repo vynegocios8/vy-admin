@@ -173,7 +173,14 @@
                                         <i class="fas fa-trash"></i>
                                     </button>
                                 </div>
-                                async function handleSave(e) {
+                            </div>
+                        </div>
+                    `;
+                });
+            }
+        }
+
+        async function handleSave(e) {
             e.preventDefault();
             const id = document.getElementById('edit-id').value;
             const newProduct = {
@@ -243,11 +250,12 @@
         loadProducts();
 
         // 🔹 Expor funções para o escopo global (corrige os botões)
+        window.handleSave = handleSave;
         window.editProduct = editProduct;
         window.deleteProduct = deleteProduct;
         window.openModal = openModal;
         window.closeModal = closeModal;
-        window.handleSave = handleSave;
     </script>
 </body>
 </html>
+                                    
